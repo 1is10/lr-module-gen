@@ -1,5 +1,13 @@
 # lr-module-gen readme
 ## Installation
+### brew / os x (m1 not yet supported)
+```
+brew install 1is10/lr-module-gen/lr-module-gen
+```
+### npm
+```
+npm i -g lr-module-gen
+```
 ### from sources
 ```zsh
 # install nodejs if not yet

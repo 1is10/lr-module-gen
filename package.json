@@ -1,6 +1,6 @@
 {
   "name": "lr-module-gen",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "",
   "main": "dist/index.js",
   "bin": {
@@ -19,7 +19,6 @@
   "keywords": [],
   "author": "lr",
   "license": "MIT",
-  "private": true,
   "dependencies": {
     "@types/ejs": "^3.1.0",
     "blessed": "^0.1.81",
