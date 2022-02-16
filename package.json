@@ -14,7 +14,7 @@
     "build": "tsc",
     "prerun": "yarn run build",
     "run": "node dist/app.js",
-    "package": "pkg . --targets node14-macos-x64 --output hello"
+    "package": "pkg . --targets node14-macos-x64 --output lr-module-gen"
   },
   "keywords": [],
   "author": "lr",
@@ -29,6 +29,7 @@
   "devDependencies": {
     "@types/blessed": "^0.1.19",
     "@types/node": "^17.0.6",
-    "@types/yargs": "^17.0.8"
+    "@types/yargs": "^17.0.8",
+    "pkg": "^5.5.2"
   }
 }
