@@ -1,23 +1,22 @@
 # lr-module-gen readme
 ## Installation
-### brew / os x (m1 not yet supported)
-```
-brew install 1is10/lr-module-gen/lr-module-gen
-```
-### npm
-```
+### npm/yarn 
+```zsh
 npm i -g lr-module-gen
+# or #
+yarn global add lr-module-gen
 ```
 ### from sources
 ```zsh
-# install nodejs if not yet
+# install nodejs + yarn if not yet
 # git clone this repo
 yarn
-yarn run run
+yarn run run # will compile cli
 yarn link
-# to de-install call `yarn unlink`
+# to uninstall 
+yarn unlink
 ```
-to recompile call
+to recompile cli
 ```zsh
 yarn run run
 ```
@@ -30,4 +29,6 @@ yarn run run
 
 ## Known bugs
 - Template module pick when calling `lr-module-gen gen` has some glitches, with double focus on filter & time delay
-- info.js inside template directory included as simple js file, with rw permissions, all templates should be checked & verified by user  
+## External templates check points
+- info.js inside template directory included as simple js file, with rw permissions, all templates should be checked & verified by user
+- 

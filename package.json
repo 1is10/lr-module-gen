@@ -1,20 +1,17 @@
 {
   "name": "lr-module-gen",
-  "version": "0.9.1",
+  "version": "0.9.3",
   "description": "",
   "main": "dist/index.js",
   "bin": {
     "lr-module-gen": "dist/app.js"
   },
-  "pkg": {
-    "scripts": "dist/**/*.js"
-  },
   "scripts": {
     "test": "jest",
     "build": "tsc",
+    "postbuild": "chmod +x dist/app.js",
     "prerun": "yarn run build",
-    "run": "node dist/app.js",
-    "package": "pkg . --targets node14-macos-x64 --output lr-module-gen"
+    "run": "node dist/app.js"
   },
   "keywords": [],
   "author": "lr",
@@ -29,6 +26,6 @@
     "@types/blessed": "^0.1.19",
     "@types/node": "^17.0.6",
     "@types/yargs": "^17.0.8",
-    "pkg": "^5.5.2"
+    "typescript": "^4.5.5"
   }
 }
