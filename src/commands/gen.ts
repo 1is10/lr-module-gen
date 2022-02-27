@@ -36,7 +36,7 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
     if (module === "*") {
         let availableModules = Object.keys(config.templatesPaths)
         if (!availableModules.length) {
-            console.error("Add modules to `.lr.module.gen` `.templatesPaths` property")
+            console.error("Add modules to `.lr.module.gen > templatesPaths` property")
             process.exit(-1)
         }
         module = await askModule(availableModules)

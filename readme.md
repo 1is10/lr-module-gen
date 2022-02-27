@@ -27,6 +27,36 @@ yarn run run
 3. All project info will be placed in `.lr.module.gen` & simple templates inside `templates` directory
 4. To generate module call `lr-module-gen gen` or `lr-module-gen gen module`
 
+## Questions & Answers
+- How to use git config parameters inside templates?
+
+This case not supported now, if you need some specific shell variables you can use js in your `.lr.module.gen` file.\
+For example like this one:
+```javascript
+const execSync = require('child_process').execSync
+
+module.exports = {
+    "generatorOutputPaths": {
+        "sources": "./src",
+        "tests": "./tests"
+    },
+    "predefinedVariables": {
+        "copyright": {
+            "value": "Template copyright",
+            "editable": false
+        },
+        "author": {
+            value: (new String(execSync('git config --global user.name'))).trim(),
+            editable: false
+        }
+    },
+    "templatesPaths": {
+        "module": "templates/module",
+        "serviceTemplate": "templates/service"
+    }
+}
+```
+
 ## Known bugs
 - Template module pick when calling `lr-module-gen gen` has some glitches, with double focus on filter & time delay
 ## External templates check points
