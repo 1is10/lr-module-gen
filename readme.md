@@ -9,6 +9,8 @@ yarn global add lr-module-gen
 ### from sources
 ```zsh
 # install nodejs + yarn if not yet
+# add yarn bin dir to your PATH, like that (add next line to your .zshrc or .bashrc)
+export PATH=$HOME/.yarn/bin:$PATH
 # git clone this repo
 yarn
 yarn run run # will compile cli

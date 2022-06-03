@@ -17,7 +17,8 @@ export const desc: string = "generate module from [module] or pick from existing
 export const builder: CommandBuilder<Options, Options> = (yargs) =>
     yargs
         .option('overwrite', {
-            default: false
+            default: false,
+            type: "boolean"
         })
         .positional("module", {type: "string", demandOption: false, default: "*"})
 
