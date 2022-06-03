@@ -4,6 +4,7 @@ import path from "path"
 import { defaultConfig } from "../config/main"
 import { materializeVFS } from "../vfs"
 import { defaultTemplateVFS } from "../config/template"
+
 const fsPromises = fs.promises
 
 type Options = {
@@ -22,14 +23,14 @@ export const builder: CommandBuilder<Options, Options> = (yargs) =>
         type: "string",
         choices: ["main", "template-sample"],
         demandOption: false,
-        default: 'main'
+        default: "main"
     })
 
 export const handler = async (argv: Arguments<Options>): Promise<void> => {
     const {config} = argv
 
     if (config == "main") {
-        let configPath = '.lr.module.gen'
+        let configPath = ".lr.module.gen"
         let permission = await fsPromises.stat(configPath).catch(_ => Promise.resolve())
         if (permission) {
             console.error(".lr.module.gen already exist")

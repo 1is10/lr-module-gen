@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
-import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
+import yargs from "yargs"
+import { hideBin } from "yargs/helpers"
 
 yargs(hideBin(process.argv))
-    .commandDir('commands')
+    .commandDir("commands")
     .strict()
-    .alias({ h: 'help' })
+    .alias({h: "help"})
     .demandCommand()
     .recommendCommands()
-    .argv;
+    .argv
