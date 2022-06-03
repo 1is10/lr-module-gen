@@ -50,7 +50,7 @@ export const materializeVFS = async (vfs: VFSNode, overwriteFiles: boolean = fal
 
               } else {
                   dirnamePromises[dirname] = Promise.resolve(dirname).then(async dirname => {
-                      console.log("making directory", dirname   )
+                      console.log("making directory", dirname)
                       await fsPromises.mkdir(path.join(process.cwd(), path.dirname(fullPath)), {
                           recursive: true
                       }).catch(_ => 1)
@@ -76,7 +76,7 @@ export const materializeVFS = async (vfs: VFSNode, overwriteFiles: boolean = fal
                 path.join(process.cwd(), fullPath),
                 simpleVFS[fullPath],
                 {
-                    encoding: "utf8",
+                    encoding: "utf8"
                 }
             ).catch(console.error)
         })

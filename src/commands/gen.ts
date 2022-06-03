@@ -55,6 +55,7 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
     let variables = info.variables
     let predefinedVariableContext: { [key: string]: any } = {}
 
+    // insert predefinedVariables
     if (config.predefinedVariables) {
         let predefinedVariables = config.predefinedVariables
         Object.keys(info.variables)
@@ -99,7 +100,7 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
     }
 
     if (info.postProcessor) {
-        vfs = info.postProcessor( vfs, variableContext)
+        vfs = info.postProcessor(vfs, variableContext)
     }
 
     await materializeVFS(vfs, overwrite)
