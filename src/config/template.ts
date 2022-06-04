@@ -65,6 +65,12 @@ export type TemplateConfigType = {
      * @param variablesContext - variables passed on templates baking + computed/predefined
      */
     postProcessor?: (vfs: VFSNode, variablesContext: { [key: string]: any }) => VFSNode
+    /**
+     * Same as post processor, but async, feel free to use Promise.all/race and await/async
+     * @param vfs - file system in json format, `out` should be placed here
+     * @param variablesContext - variables passed on templates baking + computed/predefined
+     */
+    asyncPostProcessor?: (vfs: VFSNode, variablesContext: { [key: string]: any }) => Promise<VFSNode>
 }
 
 export const loadTemplateConfig = (

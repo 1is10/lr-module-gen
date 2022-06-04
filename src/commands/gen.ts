@@ -16,7 +16,7 @@ export const desc: string = "generate module from [module] or pick from existing
 
 export const builder: CommandBuilder<Options, Options> = (yargs) =>
     yargs
-        .option('overwrite', {
+        .option("overwrite", {
             default: false,
             type: "boolean"
         })
@@ -76,10 +76,10 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
         ...await askVariables(module, variables, config),
         ...predefinedVariableContext
     }
-    // use context to generate modules
-
+    // use context to generate module
     let vfs: VFSNode = {}
-    for (let templateFileName of Object.keys(info.files)) {
+    // async fill vfs
+    await Promise.all(Object.keys(info.files).map(async (templateFileName) => {
         let templateInfo = info.files[templateFileName]
         if (templateInfo.type === "ejs") {
             vfs[templateFileName] = await ejs.renderFile(path.join(
@@ -97,10 +97,14 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
             console.error("Unsupported type", templateInfo)
             process.exit(-1)
         }
-    }
-
+    }))
+    // sync
     if (info.postProcessor) {
         vfs = info.postProcessor(vfs, variableContext)
+    }
+    // async
+    if (info.asyncPostProcessor) {
+        vfs = await info.asyncPostProcessor(vfs, variableContext)
     }
 
     await materializeVFS(vfs, overwrite)

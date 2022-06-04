@@ -74,4 +74,6 @@ module.exports = {
 - Template module pick when calling `lr-module-gen gen` has some glitches, with double focus on filter & time delay
 
 ## External templates check points
-- info.js && .lr.module.gen inside template directory included as simple js file, with rw permissions, all templates should be checked & verified by user
+
+- info.js && .lr.module.gen inside template directory included as simple js file, with rw permissions, all templates
+  should be checked & verified by user
