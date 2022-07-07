@@ -15,7 +15,6 @@ export const isVFSString = (nodeOrNot: VFSNode | string): nodeOrNot is string =>
     return typeof nodeOrNot === "string"
 }
 
-
 export const flattenVFS = (vfs: VFSNode, rootPath?: string): { [key: string]: string } => {
     let paths: { [key: string]: string } = {}
 

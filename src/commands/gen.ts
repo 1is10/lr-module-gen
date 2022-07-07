@@ -3,8 +3,14 @@ import { DotConfigType, loadConfig } from "../config/main"
 import path from "path"
 import { askModule, askVariables } from "../prompts"
 import ejs from "ejs"
-import { loadTemplateConfig, setITemplateVariableDefaultValue } from "../config/template"
+import {
+    ITemplateFileTypeAny,
+    loadTemplateConfig,
+    setITemplateVariableDefaultValue,
+    templateUtils
+} from "../config/template"
 import { materializeVFS, VFSNode } from "../vfs"
+import { globPromise } from "../utils/globUtils"
 
 type Options = {
     module: string,
@@ -27,6 +33,10 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
     let config: DotConfigType
     try {
         config = await loadConfig()
+
+        // ignore that, because we are injecting utils, for simpler template management
+        // @ts-ignore
+        config.utils = templateUtils
     } catch (e) {
         console.error("Failed to load config")
         process.exit(-1)
@@ -49,9 +59,13 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
         process.exit(-1)
     }
 
-    let absoluteTemplatePath = path.join(process.cwd(), templatePath)
+    let absoluteTemplatesPath = path.join(process.cwd(), templatePath)
+    let info = loadTemplateConfig(absoluteTemplatesPath, "info")
 
-    let info = loadTemplateConfig(absoluteTemplatePath, "info")
+    // ignore that, because we are injecting utils, for simpler template management
+    // @ts-ignore
+    info.utils = templateUtils
+
     let variables = info.variables
     let predefinedVariableContext: { [key: string]: any } = {}
 
@@ -78,27 +92,64 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
     }
     // use context to generate module
     let vfs: VFSNode = {}
-    // async fill vfs
-    await Promise.all(Object.keys(info.files).map(async (templateFileName) => {
-        let templateInfo = info.files[templateFileName]
-        if (templateInfo.type === "ejs") {
-            vfs[templateFileName] = await ejs.renderFile(path.join(
-                absoluteTemplatePath,
-                templateFileName
-            ), variableContext, {
-                async: false
-            })
-        } else if (templateInfo.type == "js") {
-            vfs[templateFileName] = require(path.join(
-                absoluteTemplatePath,
-                templateFileName
-            ))(module, variableContext)
-        } else {
+
+    // info.js: support for array of strings inside files
+    const isStringArray = (type: string[] | any): type is string[] => Array.isArray(type)
+    let filesWithTypesMaybe: string[] | { [key: string]: ITemplateFileTypeAny } = info.files
+    let filesWithTypes: { [key: string]: ITemplateFileTypeAny } = {}
+    filesWithTypes = isStringArray(filesWithTypesMaybe)
+        ? filesWithTypesMaybe.reduce((filesObj, file) => {
+            filesObj[file] = {type: "ejs"}
+            return filesObj
+        }, filesWithTypes)
+        : filesWithTypesMaybe
+
+    // async fill vfs: start
+    const renderEJSTemplate = async (vfs: VFSNode, templateFileName: string) => {
+        const templatePath = path.join(absoluteTemplatesPath, templateFileName)
+        vfs[templateFileName] = await ejs.renderFile(templatePath, variableContext, {
+            async: false
+        })
+    }
+    const renderJSTemplate = async (vfs: VFSNode, templateFileName: string) => {
+        const templatePath = path.join(absoluteTemplatesPath, templateFileName)
+        const renderResult: string | Promise<string> = require(templatePath)(module, variableContext)
+
+        if (typeof renderResult === "string") {
+            vfs[templateFileName] = renderResult
+            return
+        }
+
+        vfs[templateFileName] = await renderResult
+    }
+    await Promise.all(Object.keys(filesWithTypes).map(async (templateFileName) => {
+        const templateInfo = filesWithTypes[templateFileName]
+        switch (templateInfo.type) {
+        case "glob":
+            return await globPromise(absoluteTemplatesPath, templateFileName)
+                .then(files => Promise.all(files.map(async file => {
+                    switch (templateInfo.subtype ?? path.extname(file).substring(1).toLowerCase()) {
+                    case "ejs":
+                        return await renderEJSTemplate(vfs, file)
+                    case "js":
+                        return await renderJSTemplate(vfs, file)
+                    default:
+                        console.error("Unsupported type", templateInfo)
+                        process.exit(-1)
+                    }
+                })))
+        case "ejs":
+            return await renderEJSTemplate(vfs, templateFileName)
+        case "js":
+            return await renderJSTemplate(vfs, templateFileName)
+        default:
             console.error("Unsupported type", templateInfo)
             process.exit(-1)
         }
     }))
-    // sync
+    // async fill vfs: end
+
+    // post process
     if (info.postProcessor) {
         vfs = info.postProcessor(vfs, variableContext)
     }
@@ -107,7 +158,19 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
         vfs = await info.asyncPostProcessor(vfs, variableContext)
     }
 
+    // materialize
     await materializeVFS(vfs, overwrite)
+
+    // actions
+    if (info.postActions) {
+        info.postActions(vfs, variableContext)
+    }
+
+    // async mod
+    if (info.asyncPostActions) {
+        await info.asyncPostActions(vfs, variableContext)
+    }
+
 
     process.exit(0)
 }
