@@ -1,7 +1,7 @@
 import path from "path"
 import fs from "fs"
-import { VFSNode } from "../vfs"
-import { defaultConfigName, DotConfigType } from "./main"
+import { flattenVFS, VFSNode } from "../vfs"
+import * as childProcess from "child_process"
 
 const fsPromises = fs.promises
 
@@ -14,7 +14,13 @@ export type ITemplateFileTypeJS = {
     type: "js"
 }
 
-export type ITemplateFileTypeAny = ITemplateFileTypeEJS | ITemplateFileTypeJS
+// MultiPick helper
+export type ITemplateFileTypeGlob = {
+    type: "glob"
+    subtype?: string
+}
+
+export type ITemplateFileTypeAny = ITemplateFileTypeGlob | ITemplateFileTypeEJS | ITemplateFileTypeJS
 
 export type ITemplateVariableBase = {
     title?: string,
@@ -56,11 +62,12 @@ export type ITemplateVariableAny =
 export type TemplateConfigType = {
     files: {
         [key: string]: ITemplateFileTypeAny
-    },
+    } | Array<string>,
     variables: {
         [key: string]: ITemplateVariableAny
     },
     /**
+     * post processor for vfs, called after ejs template was populated with context input by user.
      * @param vfs - file system in json format, `out` should be placed here
      * @param variablesContext - variables passed on templates baking + computed/predefined
      */
@@ -71,6 +78,18 @@ export type TemplateConfigType = {
      * @param variablesContext - variables passed on templates baking + computed/predefined
      */
     asyncPostProcessor?: (vfs: VFSNode, variablesContext: { [key: string]: any }) => Promise<VFSNode>
+    /**
+     * Post actions, used when all files exist, receive result vfs & context as
+     * @param vfs - file system in json format, `out` should be placed here
+     * @param variablesContext - variables passed on templates baking + computed/predefined
+     */
+    postActions?: (vfs: VFSNode, variablesContext: { [key: string]: any }) => void
+    /**
+     * Same as post actions, but async (same modifier as asyncPostProcessor)
+     * @param vfs - file system in json format, `out` should be placed here
+     * @param variablesContext - variables passed on templates baking + computed/predefined
+     */
+    asyncPostActions: (vfs: VFSNode, variablesContext: { [key: string]: any }) => Promise<void>
 }
 
 export const loadTemplateConfig = (
@@ -82,13 +101,30 @@ export const loadTemplateConfig = (
     try {
         // try to parse config as node file
         return require(configPath)
-    } catch (_) {
+    } catch (err) {
+        console.error("??", err)
         // ignore, not js file
     }
 
     return JSON.parse(fs.readFileSync(configPath, {encoding: "utf8"})) as TemplateConfigType
 }
 
+export const templateUtils = {
+    // reserved for future usage
+    vfsModify: {},
+    execSync: (command: string) => childProcess.execSync(command),
+    exec: (command: string) => new Promise<string>((resolve, reject) => {
+        childProcess.exec(command, (error, _, stderr) => {
+            if (error) {
+                return reject(error)
+            }
+
+            resolve(stderr)
+        })
+    })
+}
+
+// Demo purpose variables
 export const defaultTemplateVFS: VFSNode = {
     templates: {
         module: {
@@ -138,6 +174,17 @@ module.exports = {
         }
         
         return resultVfs
+    },
+    asyncPostProcessor: async (vfs, variables) => {
+        let asyncTask = new Promise((resolve, _) => {
+            setTimeout(() => resolve(), 3000)
+        })
+        
+        console.log("Performing async task (*Promise.all can be used for multiple async tasks merging)")
+        await asyncTask
+        console.log("Async task performed")
+        
+        return vfs
     }
 }
 `,
