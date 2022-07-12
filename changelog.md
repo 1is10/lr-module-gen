@@ -14,8 +14,8 @@ Example for usage inside template manifest:
         await this.utils.exec('./scripts/any')
     },
     // & sync version
-    postActions: async function (vfs, variablesContext) {
-        await this.utils.execSync('pwd')
+    postActions: function (vfs, variablesContext) {
+        this.utils.execSync('pwd')
     }
     //...
 }
