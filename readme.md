@@ -24,10 +24,10 @@ yarn link
 yarn unlink
 ```
 
-to recompile cli
+to recompile cli run:
 
 ```zsh
-yarn run run
+yarn build
 ```
 
 ## First steps (just to figure out how it works)
@@ -71,7 +71,7 @@ module.exports = {
 
 ## Known bugs
 
-- Template module pick when calling `lr-module-gen gen` has some glitches, with double focus on filter & time delay
+- none, feel free to submit if you find any 🐞
 
 ## External templates check points
 

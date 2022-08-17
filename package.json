@@ -1,9 +1,13 @@
 {
   "name": "lr-module-gen",
   "url": "https://github.com/1is10/lr-module-gen",
-  "version": "0.9.7",
+  "version": "0.9.9",
   "description": "",
   "main": "dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/1is10/lr-module-gen.git"
+  },
   "bin": {
     "lr-module-gen": "dist/app.js"
   },
@@ -12,7 +16,8 @@
     "build": "tsc",
     "postbuild": "chmod +x dist/app.js",
     "prerun": "yarn run build",
-    "run": "node dist/app.js"
+    "run": "node dist/app.js",
+    "start": "yarn run run"
   },
   "keywords": [],
   "author": "lr",
