@@ -1,16 +1,18 @@
 import type { Arguments, CommandBuilder } from "yargs"
 import { DotConfigType, loadConfig } from "../config/main"
 import path from "path"
-import { askModule, askVariables } from "../prompts"
 import ejs from "ejs"
 import {
-    ITemplateFileTypeAny,
+    ITemplateFileTypeAny, ITemplateVariableAny,
     loadTemplateConfig,
     setITemplateVariableDefaultValue,
-    templateUtils
+    templateUtils, VariableContext
 } from "../config/template"
 import { materializeVFS, VFSNode } from "../vfs"
 import { globPromise } from "../utils/globUtils"
+import { isStringArray } from "../utils/typeCheckers"
+import { isPromise } from "util/types"
+import Prompt from "../utils/prompt"
 
 type Options = {
     module: string,
@@ -43,14 +45,18 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
     }
 
     let {module, overwrite} = argv
-
     if (module === "*") {
         let availableModules = Object.keys(config.templatesPaths)
         if (!availableModules.length) {
             console.error("Add modules to `.lr.module.gen > templatesPaths` property")
             process.exit(-1)
         }
-        module = await askModule(availableModules)
+
+        if (availableModules.length == 1) {
+            module = availableModules[0]
+        } else {
+            module = await Prompt.askModule(availableModules)
+        }
     }
 
     let templatePath = config.templatesPaths[module]
@@ -59,11 +65,11 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
         process.exit(-1)
     }
 
-    let absoluteTemplatesPath = path.join(process.cwd(), templatePath)
+    let projectDirectory = process.cwd()
+    let absoluteTemplatesPath = path.join(projectDirectory, templatePath)
     let info = loadTemplateConfig(absoluteTemplatesPath, "info")
 
-    // ignore that, because we are injecting utils, for simpler template management
-    // @ts-ignore
+    // Info Injections
     info.utils = templateUtils
 
     let variables = info.variables
@@ -86,15 +92,74 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
               })
     }
 
-    let variableContext = {
-        ...await askVariables(module, variables, config),
+    // Variables fetch
+    let allVariables = Object.keys(variables)
+    let variableContext: VariableContext = {}
+    while (allVariables.length > 0) {
+        let currentVariables: {
+            [key: string]: ITemplateVariableAny
+        } = {}
+
+        let allVariablesCount = allVariables.length
+        allVariables = allVariables.filter(variableName => {
+            let variable = variables[variableName]
+            if (!variable.conditionalShow) {
+                currentVariables[variableName] = variables[variableName]
+                return false
+            }
+
+            if (variable.conditionalShow(variableContext)) {
+                currentVariables[variableName] = variables[variableName]
+                return false
+            }
+
+            return true
+        })
+        let usedVariablesCount = allVariablesCount - allVariables.length
+        if (usedVariablesCount > 0) {
+            variableContext = {
+                ...variableContext,
+                ...await Prompt.askVariables(
+                    module,
+                    currentVariables,
+                    {
+                        absoluteTemplatesPath,
+                        projectDirectory,
+                        config
+                    }
+                )
+            }
+        } else {
+            // usedVariablesCount == 0, no variables used in current cycle
+            // end cycle by emptying required variables
+            //
+            // non-used variables can be saved here
+            allVariables = []
+        }
+    } // conditional variables support: end
+
+    // append predefined variables, they always overwrite context from user input
+    variableContext = {
+        ...variableContext,
         ...predefinedVariableContext
     }
-    // use context to generate module
+    // Variables fetch: end
+
+    if (info.preProcessor) {
+        const updatedContext = info.preProcessor(variableContext)
+        variableContext = isPromise(updatedContext) ? await updatedContext : updatedContext
+    }
+
+    // [!] Deprecated, will be removed in next release
+    if (info.asyncPreProcessor) {
+        variableContext = await info.asyncPreProcessor(variableContext)
+    }
+
+    // Result files context
     let vfs: VFSNode = {}
 
-    // info.js: support for array of strings inside files
-    const isStringArray = (type: string[] | any): type is string[] => Array.isArray(type)
+    // Files fetch
+    // * info.js: support for array of strings inside info.js:files
     let filesWithTypesMaybe: string[] | { [key: string]: ITemplateFileTypeAny } = info.files
     let filesWithTypes: { [key: string]: ITemplateFileTypeAny } = {}
     filesWithTypes = isStringArray(filesWithTypesMaybe)
@@ -105,6 +170,7 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
         : filesWithTypesMaybe
 
     // async fill vfs: start
+    // * helper utils
     const renderEJSTemplate = async (vfs: VFSNode, templateFileName: string) => {
         const templatePath = path.join(absoluteTemplatesPath, templateFileName)
         vfs[templateFileName] = await ejs.renderFile(templatePath, variableContext, {
@@ -115,13 +181,15 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
         const templatePath = path.join(absoluteTemplatesPath, templateFileName)
         const renderResult: string | Promise<string> = require(templatePath)(module, variableContext)
 
-        if (typeof renderResult === "string") {
-            vfs[templateFileName] = renderResult
+        if (isPromise(renderResult)) {
+            vfs[templateFileName] = await renderResult
             return
         }
 
-        vfs[templateFileName] = await renderResult
+        vfs[templateFileName] = renderResult
     }
+
+    // * actual template generation
     await Promise.all(Object.keys(filesWithTypes).map(async (templateFileName) => {
         const templateInfo = filesWithTypes[templateFileName]
         switch (templateInfo.type) {
@@ -151,9 +219,11 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
 
     // post process
     if (info.postProcessor) {
-        vfs = info.postProcessor(vfs, variableContext)
+        const result = info.postProcessor(vfs, variableContext)
+        vfs = isPromise(result) ? await result : result
     }
-    // async
+
+    // [!] Deprecated, will be removed in next release
     if (info.asyncPostProcessor) {
         vfs = await info.asyncPostProcessor(vfs, variableContext)
     }
@@ -163,14 +233,14 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
 
     // actions
     if (info.postActions) {
-        info.postActions(vfs, variableContext)
+        const result = info.postActions(vfs, variableContext)
+        if (isPromise(result)) { await result }
     }
 
-    // async mod
+    // [!] Deprecated, will be removed in next release
     if (info.asyncPostActions) {
         await info.asyncPostActions(vfs, variableContext)
     }
-
 
     process.exit(0)
 }

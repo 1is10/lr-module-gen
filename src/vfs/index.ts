@@ -15,6 +15,24 @@ export const isVFSString = (nodeOrNot: VFSNode | string): nodeOrNot is string =>
     return typeof nodeOrNot === "string"
 }
 
+/**
+ * Make one level object from input vfs system
+ * for example, from this to
+ * {
+ *     directoryFoo: {
+ *         directoryBar: { "readme.txt": "Some readme content" },
+ *         "foo.ts": "Some typescript code"
+ *     }
+ * }
+ * to this
+ * {
+ *     "directoryFoo/directoryBar/readme.txt": "Some readme content",
+ *     "directoryFoo/foo.ts": "Some typescript code"
+ * }
+ * * clear function
+ * @param vfs - input, will
+ * @param rootPath - here only for recursion, don't use it
+ */
 export const flattenVFS = (vfs: VFSNode, rootPath?: string): { [key: string]: string } => {
     let paths: { [key: string]: string } = {}
 
@@ -37,9 +55,9 @@ export const flattenVFS = (vfs: VFSNode, rootPath?: string): { [key: string]: st
     return paths
 }
 
+
 export const materializeVFS = async (vfs: VFSNode, overwriteFiles: boolean = false) => {
     let simpleVFS = flattenVFS(vfs)
-
     let dirnamePromises: { [key: string]: Promise<string> | undefined } = {}
 
     Object.keys(simpleVFS)

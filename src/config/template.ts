@@ -1,11 +1,10 @@
 import path from "path"
-import fs from "fs"
-import { flattenVFS, VFSNode } from "../vfs"
+import { VFSNode } from "../vfs"
 import * as childProcess from "child_process"
+import { PatchBuilder, PatchBuilderOptions } from "../utils/builders/PatchBuilder"
+import { VFSPatcher } from "../utils/builders/VFSPatcher"
 
-const fsPromises = fs.promises
-
-
+// # info.js:files types
 export type ITemplateFileTypeEJS = {
     type: "ejs"
 }
@@ -14,7 +13,7 @@ export type ITemplateFileTypeJS = {
     type: "js"
 }
 
-// MultiPick helper
+// ## MultiPick helper
 export type ITemplateFileTypeGlob = {
     type: "glob"
     subtype?: string
@@ -22,9 +21,13 @@ export type ITemplateFileTypeGlob = {
 
 export type ITemplateFileTypeAny = ITemplateFileTypeGlob | ITemplateFileTypeEJS | ITemplateFileTypeJS
 
+// # Variable types
+export type VariableContext = { [key: string]: any }
+
 export type ITemplateVariableBase = {
     title?: string,
-    description?: string
+    description?: string,
+    conditionalShow?: (context: VariableContext) => boolean
 }
 
 export type ITemplateVariableTypeString = ITemplateVariableBase & {
@@ -37,27 +40,38 @@ export type ITemplateVariableTypeBoolean = ITemplateVariableBase & {
     type: "boolean"
 }
 
-export type ITemplateVariableTypeOutputPath = ITemplateVariableBase & {
+export type ITemplateVariableTypePicker = ITemplateVariableBase & {
     default?: string
-    type: "outputPath"
+    variants: string[]
+    type: "picker"
 }
 
-export const setITemplateVariableDefaultValue = (variable: ITemplateVariableAny, value: any) => {
-    if (variable.type == "string") {
-        variable.default = value
-    } else if (variable.type == "boolean") {
-        variable.default = value
-    } else if (variable.type == "outputPath") {
-        variable.default = value
-    } else {
-        throw new Error("Attempt to set unknown variable")
-    }
+export type ITemplateVariableTypeFilePicker = ITemplateVariableBase & {
+    default?: string
+    variants: (string|{type: "glob" | "path", value: string})[]
+    type: "filePicker"
 }
 
 export type ITemplateVariableAny =
     ITemplateVariableTypeString |
     ITemplateVariableTypeBoolean |
-    ITemplateVariableTypeOutputPath
+    ITemplateVariableTypePicker |
+    ITemplateVariableTypeFilePicker
+
+// # Variable methods
+export const setITemplateVariableDefaultValue = (variable: ITemplateVariableAny, value: any) => {
+    if (variable.type == "string") {
+        variable.default = value
+    } else if (variable.type == "boolean") {
+        variable.default = value
+    } else if (variable.type == "picker") {
+        variable.default = value
+    } else if (variable.type == "filePicker") {
+        variable.default = value
+    } else {
+        throw new Error("Attempt to set unknown variable")
+    }
+}
 
 export type TemplateConfigType = {
     files: {
@@ -67,29 +81,35 @@ export type TemplateConfigType = {
         [key: string]: ITemplateVariableAny
     },
     /**
-     * post processor for vfs, called after ejs template was populated with context input by user.
+     * Preprocessor for variablesContext, called before ejs template generation.
      * @param vfs - file system in json format, `out` should be placed here
      * @param variablesContext - variables passed on templates baking + computed/predefined
+     * @returns VFSNode | Promise<VFSNode> - Promise here only for async method calls support
      */
-    postProcessor?: (vfs: VFSNode, variablesContext: { [key: string]: any }) => VFSNode
+    preProcessor?: (variablesContext: VariableContext) => (VariableContext | Promise<VariableContext>)
     /**
-     * Same as post processor, but async, feel free to use Promise.all/race and await/async
+     * postprocessor for vfs, called after ejs template was populated with context input by user.
      * @param vfs - file system in json format, `out` should be placed here
      * @param variablesContext - variables passed on templates baking + computed/predefined
+     * @returns VFSNode | Promise<VFSNode> - VFSNode that should be written on disk
      */
-    asyncPostProcessor?: (vfs: VFSNode, variablesContext: { [key: string]: any }) => Promise<VFSNode>
+    postProcessor?: (vfs: VFSNode, variablesContext: VariableContext) => VFSNode | Promise<VFSNode>
     /**
      * Post actions, used when all files exist, receive result vfs & context as
      * @param vfs - file system in json format, `out` should be placed here
      * @param variablesContext - variables passed on templates baking + computed/predefined
+     * @returns any | Promise<any> - result is unused
      */
-    postActions?: (vfs: VFSNode, variablesContext: { [key: string]: any }) => void
-    /**
-     * Same as post actions, but async (same modifier as asyncPostProcessor)
-     * @param vfs - file system in json format, `out` should be placed here
-     * @param variablesContext - variables passed on templates baking + computed/predefined
-     */
-    asyncPostActions: (vfs: VFSNode, variablesContext: { [key: string]: any }) => Promise<void>
+    postActions?: (vfs: VFSNode, variablesContext: VariableContext) => any | Promise<any>
+
+    // [!] reserved fields, don't use them
+    // - injections
+    utils: typeof templateUtils
+
+    // [!] Deprecated, will be removed in next release
+    asyncPreProcessor?: (variablesContext: VariableContext) => Promise<VariableContext>
+    asyncPostProcessor?: (vfs: VFSNode, variablesContext: VariableContext) => Promise<VFSNode>
+    asyncPostActions?: (vfs: VFSNode, variablesContext: VariableContext) => Promise<any>
 }
 
 export const loadTemplateConfig = (
@@ -97,23 +117,22 @@ export const loadTemplateConfig = (
     configFile: string = "info"
 ): TemplateConfigType => {
     const configPath = path.join(modulePath, configFile)
-
     try {
         // try to parse config as node file
         return require(configPath)
     } catch (err) {
-        console.error("??", err)
-        // ignore, not js file
+        console.error("Failed to read template info.js", err)
+        throw err
     }
-
-    return JSON.parse(fs.readFileSync(configPath, {encoding: "utf8"})) as TemplateConfigType
 }
 
 export const templateUtils = {
-    // reserved for future usage
-    vfsModify: {},
-    execSync: (command: string) => childProcess.execSync(command),
-    exec: (command: string) => new Promise<string>((resolve, reject) => {
+    vfsModify: (vfs: VFSNode): VFSPatcher => new VFSPatcher(vfs),
+    patch: (file: string, options: PatchBuilderOptions = {}): PatchBuilder => {
+        return new PatchBuilder(file, options)
+    },
+    // utils
+    exec: async (command: string) => new Promise<string>((resolve, reject) => {
         childProcess.exec(command, (error, _, stderr) => {
             if (error) {
                 return reject(error)
@@ -121,10 +140,14 @@ export const templateUtils = {
 
             resolve(stderr)
         })
-    })
+    }),
+    // Sync methods
+    sync: {
+        exec: (command: string) => childProcess.execSync(command)
+    }
 }
 
-// Demo purpose variables
+// Demo purpose variables (Demo repo will be better, but...)
 export const defaultTemplateVFS: VFSNode = {
     templates: {
         module: {
@@ -160,7 +183,7 @@ module.exports = {
         },
         sources: {
             description: "Here main files will be copied",
-            type: "outputPath",
+            type: "string",
         },
     },
     postProcessor: (vfs, variables) => {

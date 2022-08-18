@@ -1,7 +1,7 @@
 import type { Arguments, CommandBuilder } from "yargs"
 import fs, { mkdir } from "fs"
 import path from "path"
-import { defaultConfig } from "../config/main"
+import { DotConfigType } from "../config/main"
 import { materializeVFS } from "../vfs"
 import { defaultTemplateVFS } from "../config/template"
 
@@ -36,6 +36,23 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
             console.error(".lr.module.gen already exist")
             process.exit(0)
             return
+        }
+
+        const defaultConfig: DotConfigType = {
+            generatorOutputPaths: {
+                "sources": "./src",
+                "tests": "./tests"
+            },
+            predefinedVariables: {
+                copyright: {
+                    value: "Template copyright",
+                    editable: false
+                }
+            },
+            templatesPaths: {
+                "module": "templates/module",
+                "serviceTemplate": "templates/service"
+            }
         }
 
         await fsPromises.writeFile(configPath, JSON.stringify(defaultConfig, null, 4))
