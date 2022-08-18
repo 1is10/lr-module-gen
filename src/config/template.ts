@@ -141,7 +141,7 @@ export const templateUtils = {
             resolve(stderr)
         })
     }),
-    // Sync methods, don't use them -_-
+    // Sync methods
     sync: {
         exec: (command: string) => childProcess.execSync(command)
     }

@@ -2,7 +2,7 @@ import { ITemplateVariableTypeBoolean } from "../../../config/template"
 import blessed, { Widgets } from "blessed"
 
 /**
- * Bool picker
+ * Bool checkbox input
  * @param title - string, displayed title, used for x offset
  * @param topOffset - int, used for form positioning
  * @param variableName - string, used as key in context

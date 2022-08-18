@@ -130,16 +130,19 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
                 )
             }
         } else {
-            // not all variables filled
+            // usedVariablesCount == 0, no variables used in current cycle
+            // end cycle by emptying required variables
+            //
+            // non-used variables can be saved here
             allVariables = []
         }
     } // conditional variables support: end
 
+    // append predefined variables, they always overwrite context from user input
     variableContext = {
         ...variableContext,
         ...predefinedVariableContext
     }
-
     // Variables fetch: end
 
     if (info.preProcessor) {

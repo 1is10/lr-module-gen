@@ -3,11 +3,11 @@ import blessed, { Widgets } from "blessed"
 import PromptConstant from "../constants"
 
 /**
- * Variants picker, contain output paths from `.lr.module.gen > generatorOutputPaths`
+ * Variants picker input, that allows pick one value from strings list
  * @param title - string, displayed title, used for x offset
  * @param topOffset - int, used for form positioning
  * @param variableName - string, used as key in context
- * @param variable - ITemplateVariableTypeOutputPath, info about variable
+ * @param variable - ITemplateVariableTypePicker, contains variants to display for picking
  * @param parent - parent widget, used to place children
  * @param context - key/value for saving information from widget and passing to ejs template
  * @return offset - number of rendered lines
